@@ -264,7 +264,7 @@ RAMFUNC void flash_move( uint32_t dst, uint32_t src, uint32_t size )
     if ((addr & (FLASH_SECTOR_SIZE - 1)) == 0) {
       if (flash_sector_not_erased( addr )) {
         #if defined(__IMXRT1062__)
-          flash_erase_sector( (void *)addr );
+          eepromemu_flash_erase_sector( (void *)addr );
         #elif (FLASH_WRITE_SIZE==4)
           error |= flash_erase_sector( addr, 1 );
           if (addr == (0x40C & ~(FLASH_SECTOR_SIZE - 1)))
@@ -282,7 +282,7 @@ RAMFUNC void flash_move( uint32_t dst, uint32_t src, uint32_t size )
     #if defined(__IMXRT1062__)
       // for T4.x, data address passed to flash_write() must be in RAM
       uint32_t value = *(uint32_t *)(src + offset);     
-      flash_write( (void*)addr, &value, 4 );
+      eepromemu_flash_write( (void*)addr, &value, 4 );
     #elif (FLASH_WRITE_SIZE==4)
       error |= flash_word( addr, *(uint32_t *)(src + offset), 1, 0 );
     #elif (FLASH_WRITE_SIZE==8)
@@ -302,9 +302,9 @@ RAMFUNC void flash_move( uint32_t dst, uint32_t src, uint32_t size )
       if ((addr & (FLASH_SECTOR_SIZE - 1)) == 0) {
         if (flash_sector_not_erased( addr )) {
           #if defined(__IMXRT1062__)
-            flash_erase_sector( (void*)addr );
+            eepromemu_flash_erase_sector( (void*)addr );
           #else
-            error |= flash_erase_sector( addr, 0);
+            error |= flash_erase_sector( addr, 0 );
           #endif
 	}
       }
@@ -330,7 +330,7 @@ int flash_erase_block( uint32_t start, uint32_t size )
     if ((address & (FLASH_SECTOR_SIZE - 1)) == 0) {
       if (flash_sector_not_erased( address )) {
 	#if defined(__IMXRT1062__)
-          flash_erase_sector( (void*)address );
+          eepromemu_flash_erase_sector( (void*)address );
         #elif defined(KINETISK) || defined(KINETISL)
           error = flash_erase_sector( address, 0 );
 	#endif
@@ -374,7 +374,7 @@ int flash_write_block( uint32_t addr, char *data, uint32_t count )
       continue;						//     continue while()
     }							//   
     #if defined(__IMXRT1062__)				//   #if T4.x 4-byte
-      flash_write( (void*)addr, (void*)&buf, 4 );	//     flash_write()
+      eepromemu_flash_write((void*)addr,(void*)&buf,4);	//     flash_write()
     #elif (FLASH_WRITE_SIZE==4)				//   #elif T3.x 4-byte 
       ret = flash_word( addr, buf, 0, 0 );		//     flash_word()
     #elif (FLASH_WRITE_SIZE==8)				//   #elif T3.x 8-byte
@@ -475,139 +475,3 @@ void LMEM_CodeCacheClearAll(void)
 
 #endif
 
-#if defined(__IMXRT1062__)
-
-/* Teensyduino Core Library
-   http://www.pjrc.com/teensy/
-   Copyright (c) 2019 PJRC.COM, LLC.
-
-   Permission is hereby granted, free of charge, to any person obtaining
-   a copy of this software and associated documentation files (the
-   "Software"), to deal in the Software without restriction, including
-   without limitation the rights to use, copy, modify, merge, publish,
-   distribute, sublicense, and/or sell copies of the Software, and to
-   permit persons to whom the Software is furnished to do so, subject to
-   the following conditions:
-
-   1. The above copyright notice and this permission notice shall be
-   included in all copies or substantial portions of the Software.
-
-   2. If the Software is incorporated into a build system that allows
-   selection among a list of target devices, then similar target
-   devices manufactured by PJRC.COM must be included in the list of
-   target devices and selectable in the same manner.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-   SOFTWARE.
-*/
-
-// Generally you should avoid editing this code, unless you really
-// know what you're doing.
-
-#include <WProgram.h>	// FASTRUN
-#include "imxrt.h"
-#include <string.h>
-#include "debug/printf.h"
-
-#define LUT0(opcode, pads, operand) (FLEXSPI_LUT_INSTRUCTION((opcode), (pads), (operand)))
-#define LUT1(opcode, pads, operand) (FLEXSPI_LUT_INSTRUCTION((opcode), (pads), (operand)) << 16)
-#define CMD_SDR         FLEXSPI_LUT_OPCODE_CMD_SDR
-#define ADDR_SDR        FLEXSPI_LUT_OPCODE_RADDR_SDR
-#define READ_SDR        FLEXSPI_LUT_OPCODE_READ_SDR
-#define WRITE_SDR       FLEXSPI_LUT_OPCODE_WRITE_SDR
-#define PINS1           FLEXSPI_LUT_NUM_PADS_1
-#define PINS4           FLEXSPI_LUT_NUM_PADS_4
-
-FASTRUN static void flash_wait()
-{
-  FLEXSPI_LUT60 = LUT0(CMD_SDR, PINS1, 0x05) | LUT1(READ_SDR, PINS1, 1); // 05 = read status
-  FLEXSPI_LUT61 = 0;
-  uint8_t status;
-  do {
-    FLEXSPI_IPRXFCR = FLEXSPI_IPRXFCR_CLRIPRXF; // clear rx fifo
-    FLEXSPI_IPCR0 = 0;
-    FLEXSPI_IPCR1 = FLEXSPI_IPCR1_ISEQID(15) | FLEXSPI_IPCR1_IDATSZ(1);
-    FLEXSPI_IPCMD = FLEXSPI_IPCMD_TRG;
-    while (!(FLEXSPI_INTR & FLEXSPI_INTR_IPCMDDONE)) {
-      asm("nop");
-    }
-    FLEXSPI_INTR = FLEXSPI_INTR_IPCMDDONE;
-    status = *(uint8_t *)&FLEXSPI_RFDR0;
-  } while (status & 1);
-  FLEXSPI_MCR0 |= FLEXSPI_MCR0_SWRESET; // purge stale data from FlexSPI's AHB FIFO
-  while (FLEXSPI_MCR0 & FLEXSPI_MCR0_SWRESET) ; // wait
-  __enable_irq();
-}
-
-// write bytes into flash memory (which is already erased to 0xFF)
-FASTRUN void flash_write(void *addr, const void *data, uint32_t len)
-{
-  __disable_irq();
-  FLEXSPI_LUTKEY = FLEXSPI_LUTKEY_VALUE;
-  FLEXSPI_LUTCR = FLEXSPI_LUTCR_UNLOCK;
-  FLEXSPI_IPCR0 = 0;
-  FLEXSPI_LUT60 = LUT0(CMD_SDR, PINS1, 0x06); // 06 = write enable
-  FLEXSPI_LUT61 = 0;
-  FLEXSPI_LUT62 = 0;
-  FLEXSPI_LUT63 = 0;
-  FLEXSPI_IPCR1 = FLEXSPI_IPCR1_ISEQID(15);
-  FLEXSPI_IPCMD = FLEXSPI_IPCMD_TRG;
-  arm_dcache_delete(addr, len); // purge old data from ARM's cache
-  while (!(FLEXSPI_INTR & FLEXSPI_INTR_IPCMDDONE)) ; // wait
-  FLEXSPI_INTR = FLEXSPI_INTR_IPCMDDONE;
-  FLEXSPI_LUT60 = LUT0(CMD_SDR, PINS1, 0x32) | LUT1(ADDR_SDR, PINS1, 24); // 32 = quad write
-  FLEXSPI_LUT61 = LUT0(WRITE_SDR, PINS4, 1);
-  FLEXSPI_IPTXFCR = FLEXSPI_IPTXFCR_CLRIPTXF; // clear tx fifo
-  FLEXSPI_IPCR0 = (uint32_t)addr & 0x001FFFFF;
-  FLEXSPI_IPCR1 = FLEXSPI_IPCR1_ISEQID(15) | FLEXSPI_IPCR1_IDATSZ(len);
-  FLEXSPI_IPCMD = FLEXSPI_IPCMD_TRG;
-  const uint8_t *src = (const uint8_t *)data;
-  uint32_t n;
-  while (!((n = FLEXSPI_INTR) & FLEXSPI_INTR_IPCMDDONE)) {
-    if (n & FLEXSPI_INTR_IPTXWE) {
-      uint32_t wrlen = len;
-      if (wrlen > 8) wrlen = 8;
-      if (wrlen > 0) {
-        memcpy((void *)&FLEXSPI_TFDR0, src, wrlen);
-        src += wrlen;
-        len -= wrlen;
-      }
-      FLEXSPI_INTR = FLEXSPI_INTR_IPTXWE;
-    }
-  }
-  FLEXSPI_INTR = FLEXSPI_INTR_IPCMDDONE | FLEXSPI_INTR_IPTXWE;
-  flash_wait();
-}
-
-// erase a 4K sector
-FASTRUN void flash_erase_sector(void *addr)
-{
-  __disable_irq();
-  FLEXSPI_LUTKEY = FLEXSPI_LUTKEY_VALUE;
-  FLEXSPI_LUTCR = FLEXSPI_LUTCR_UNLOCK;
-  FLEXSPI_LUT60 = LUT0(CMD_SDR, PINS1, 0x06); // 06 = write enable
-  FLEXSPI_LUT61 = 0;
-  FLEXSPI_LUT62 = 0;
-  FLEXSPI_LUT63 = 0;
-  FLEXSPI_IPCR0 = 0;
-  FLEXSPI_IPCR1 = FLEXSPI_IPCR1_ISEQID(15);
-  FLEXSPI_IPCMD = FLEXSPI_IPCMD_TRG;
-  arm_dcache_delete((void *)((uint32_t)addr & 0xFFFFF000), 4096); // purge data from cache
-  while (!(FLEXSPI_INTR & FLEXSPI_INTR_IPCMDDONE)) ; // wait
-  FLEXSPI_INTR = FLEXSPI_INTR_IPCMDDONE;
-  FLEXSPI_LUT60 = LUT0(CMD_SDR, PINS1, 0x20) | LUT1(ADDR_SDR, PINS1, 24); // 20 = sector erase
-  FLEXSPI_IPCR0 = (uint32_t)addr & 0x001FF000;
-  FLEXSPI_IPCR1 = FLEXSPI_IPCR1_ISEQID(15);
-  FLEXSPI_IPCMD = FLEXSPI_IPCMD_TRG;
-  while (!(FLEXSPI_INTR & FLEXSPI_INTR_IPCMDDONE)) ; // wait
-  FLEXSPI_INTR = FLEXSPI_INTR_IPCMDDONE;
-  flash_wait();
-}
-
-#endif

@@ -66,7 +66,7 @@
   #define FLASH_BASE_ADDR	(0x60000000)		// code starts here
 #elif defined(__IMXRT1062__) && defined(ARDUINO_TEENSY_MICROMOD)
   #define FLASH_ID		"fw_teensyMM"		// target ID (in code)
-  #define FLASH_SIZE		(0x800000)		// 8MB
+  #define FLASH_SIZE		(0x1000000)		// 16MB
   #define FLASH_SECTOR_SIZE	(0x1000)		// 4KB sector size
   #define FLASH_WRITE_SIZE	(4)			// 4-byte/32-bit writes    
   #define FLASH_RESERVE		(4*FLASH_SECTOR_SIZE)	// reserve top of flash 
@@ -114,12 +114,13 @@ void LMEM_CodeCacheClearAll(void);
 
 #elif defined(__IMXRT1062__)
 
-#include <stdint.h>     // uint32_t, etc.
-#include <WProgram.h>	// FASTRUN
+RAMFUNC int flash_sector_not_erased( uint32_t address );
 
-FASTRUN void flash_write( void *addr, const void *data, uint32_t len );
-FASTRUN void flash_erase_sector( void *addr );
-RAMFUNC int  flash_sector_not_erased( uint32_t address );
+// from cores\Teensy4\eeprom.c  --  use these functions at your own risk!!!
+extern "C" void eepromemu_flash_write(void *addr, const void *data, uint32_t len);
+extern "C" void eepromemu_flash_erase_sector(void *addr);
+extern "C" void eepromemu_flash_erase_32K_block(void *addr);
+extern "C" void eepromemu_flash_erase_64K_block(void *addr);
 
 #endif // __IMXRT1062__
 
@@ -127,11 +128,11 @@ RAMFUNC int  flash_sector_not_erased( uint32_t address );
 RAMFUNC void flash_move( uint32_t dst, uint32_t src, uint32_t size );
 
 // functions that can be in flash
-int flash_write_block( uint32_t addr, char *data, uint32_t count );
-int flash_erase_block( uint32_t address, uint32_t size );
+int  flash_write_block( uint32_t addr, char *data, uint32_t count );
+int  flash_erase_block( uint32_t address, uint32_t size );
 
-int check_flash_id( uint32_t buffer, uint32_t size );
-int firmware_buffer_init( uint32_t *buffer_addr, uint32_t *buffer_size );
+int  check_flash_id( uint32_t buffer, uint32_t size );
+int  firmware_buffer_init( uint32_t *buffer_addr, uint32_t *buffer_size );
 void firmware_buffer_free( uint32_t buffer_addr, uint32_t buffer_size );
 
 #endif // _FLASHTXX_H_

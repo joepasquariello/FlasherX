@@ -15,6 +15,11 @@
 // and/or documentation provided, including, without limitation, warranty of
 // merchantability and fitness for a particular purpose.
 
+// 7th Modifications 01/07/22 updates by Joe Pasquariello (v2.1)
+//   - FlashTxx.cpp delete local T4x wait/write/erase to use functions in TD 1.56
+//   - FlashTxx.h update FLASH_SIZE for Teensy Micromod from 8 to 16 MB
+//   - FlasherX.ino update to print "FlasherX OTA firmware update v2.1" on bootup
+//   - add option to artificially increase code size via const array (in flash)
 // 6th Modifications 11/18/21 bug fix in file FlashTXX.cpp by Joe Pasquariello
 //   - fix logic in while loop in flash_block_write() in FlashTXX
 // 5th Modifications 10/27/21 add support for Teensy Micromod by Joe Pasquariello
@@ -43,6 +48,21 @@
 
 const int ledPin = 13;		// LED
 Stream *serial = &Serial;	// Serial (USB) or Serial1, Serial2, etc. (UART)
+
+#define LARGE_ARRAY_TEST (0)	// 1 = define large array for large code download
+
+#if (LARGE_ARRAY_TEST)
+// nested arrays of integers to add code size for testing 
+#define A0 { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15}  // 16  elements 64
+#define A1 {A0,A0,A0,A0,A0,A0,A0,A0,A0,A0,A0,A0,A0,A0,A0,A0}  // 256 elements 1KB 
+#define A2 {A1,A1,A1,A1,A1,A1,A1,A1,A1,A1,A1,A1,A1,A1,A1,A1}  // 4K  elements 16KB
+#define A3 {A2,A2,A2,A2,A2,A2,A2,A2,A2,A2,A2,A2,A2,A2,A2,A2}  // 64K elements 256KB 
+#define A4 {A3,A3,A3,A3,A3,A3,A3,A3,A3,A3,A3,A3,A3,A3,A3,A3}  // 1M  elements 4MB
+
+// const variables reside in flash and get optimized out if never accessed
+// use uint8_t -> 1MB, uint16_t -> 2MB, uint32_t -> 4MB, uint64_t -> 8MB)
+PROGMEM const uint8_t a[16][16][16][16][16] = A4;
+#endif
 
 //******************************************************************************
 // hex_info_t	struct for hex record and hex file info
@@ -77,11 +97,15 @@ void setup ()
     ((HardwareSerial*)serial)->begin( 115200 );
   } 
 
-  serial->printf( "\nFlasherX OTA firmware update v2 %s %s\n", __DATE__, __TIME__ );
+  serial->printf( "\nFlasherX v2.1 -- OTA firmware update -- %s %s\n", __DATE__, __TIME__ );
   serial->printf( "WARNING: this can ruin your device\n" );
   serial->printf( "target = %s (%dK flash in %dK sectors)\n",
 			FLASH_ID, FLASH_SIZE/1024, FLASH_SECTOR_SIZE/1024);
-
+			
+#if (LARGE_ARRAY_TEST) // if true, access array so it doesn't get optimized out
+  serial->printf( "Large Array Test -- %08lX\n", (uint32_t)&a[15][15][15][15][15] );
+#endif
+  
   pinMode(ledPin, OUTPUT);	// assign output
   digitalWrite(ledPin, HIGH);	// set the LED on
   delay(200);			// delay
