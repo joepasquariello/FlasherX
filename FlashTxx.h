@@ -117,10 +117,10 @@ void LMEM_CodeCacheClearAll(void);
 RAMFUNC int flash_sector_not_erased( uint32_t address );
 
 // from cores\Teensy4\eeprom.c  --  use these functions at your own risk!!!
-extern "C" void eepromemu_flash_write(void *addr, const void *data, uint32_t len);
-extern "C" void eepromemu_flash_erase_sector(void *addr);
-extern "C" void eepromemu_flash_erase_32K_block(void *addr);
-extern "C" void eepromemu_flash_erase_64K_block(void *addr);
+void eepromemu_flash_write(void *addr, const void *data, uint32_t len);
+void eepromemu_flash_erase_sector(void *addr);
+void eepromemu_flash_erase_32K_block(void *addr);
+void eepromemu_flash_erase_64K_block(void *addr);
 
 #endif // __IMXRT1062__
 
