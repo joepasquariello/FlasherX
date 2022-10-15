@@ -44,7 +44,7 @@ The diagram below shows the use of flash, with the low (base) address at the lef
 
 For T4.x, the buffer can optionally be placed in RAM by setting macro RAM_BUFFER_SIZE in FlashTxx.h to a value > 0. For my testing I used a 256Kb buffer by setting RAM_BUFFER_SIZE (256*1024).
 
-In the FlasherX.ino file, choose the Serial port for hex file transfer by setting the "serial" variable to "Serial" for USB, or Serial1 (or any available hardware) for UART. The function update_firmware() in FXUtils.cpp takes two Stream* argumnents. The first is a Stream* for the hex file input, and the second is a Stream* to the serial monitor for user i/o. The use of Stream* for input allows the same code to be used for hex file transfer via serial or via SD card. When the file transfer is complete, the number of lines read is displayed and the user is prompted to enter that value to trigger the udpate, or 0 to cancel the update.
+In the FlasherX.ino file, choose the Serial port for hex file transfer by setting the "serial" variable to "Serial" for USB, or Serial1 (or any available hardware) for UART. The function update_firmware() in FXUtils.cpp takes two Stream* arguments. The first is a Stream* for the hex file input, and the second is a Stream* to the serial monitor for user i/o. The use of Stream* for input allows the same code to be used for hex file transfer via serial or via SD card. When the file transfer is complete, the number of lines read is displayed and the user is prompted to enter that value to trigger the udpate, or 0 to cancel the update.
 
 For transfers via custom clients, these functions in FlashTxx.c/h provide this API:
 
