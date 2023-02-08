@@ -236,6 +236,7 @@ int parse_hex_line( const char *theline, char *bytes,
   int temp;
 
   *num = 0;
+  delay(2); // Delay a short moment to allow for `theline` to be saved before accessing it... Don't believe this is necessary? Remove this line and see what happens...
   if (theline[0] != ':')
     return 0;
   if (strlen (theline) < 11)
